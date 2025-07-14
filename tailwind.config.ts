@@ -63,6 +63,18 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				}
 			},
+			fontFamily: {
+				sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'SF Pro Display', 'system-ui', 'sans-serif'],
+			},
+			backgroundImage: {
+				'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+				'gradient-craft': 'var(--gradient-bg)',
+				'gradient-card': 'var(--gradient-card)',
+			},
+			boxShadow: {
+				'card': 'var(--shadow-card)',
+				'card-hover': 'var(--shadow-card-hover)',
+			},
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',

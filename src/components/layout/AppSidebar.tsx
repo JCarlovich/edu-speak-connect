@@ -73,41 +73,43 @@ export function AppSidebar() {
   const navItems = user.role === 'teacher' ? teacherNavItems : studentNavItems;
   
   const getNavClassName = ({ isActive }: { isActive: boolean }) =>
-    isActive ? 'bg-blue-100 text-blue-900 font-medium' : 'hover:bg-gray-100';
+    isActive 
+      ? 'bg-primary/10 text-primary border-primary/20 shadow-sm' 
+      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground border-transparent';
 
   return (
-    <Sidebar className="w-64 border-r bg-white">
-      <SidebarHeader className="border-b p-4">
+    <Sidebar className="w-64 border-r border-border/50 bg-sidebar backdrop-blur-sm">
+      <SidebarHeader className="border-b border-border/50 p-6">
         <button 
           onClick={() => navigate('/')}
-          className="flex items-center gap-3 w-full hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors"
+          className="flex items-center gap-3 w-full hover:bg-accent/60 rounded-xl p-3 -m-3 transition-all duration-200 group"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-emerald-500 text-white font-bold">
-            <GraduationCap className="h-6 w-6" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg group-hover:shadow-xl transition-all">
+            <GraduationCap className="h-7 w-7" />
           </div>
           <div className="text-left">
-            <h2 className="font-bold text-lg text-gray-900">EduTranscribe</h2>
-            <p className="text-sm text-gray-500 capitalize">{user.role}</p>
+            <h2 className="font-bold text-xl bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">EduTranscribe</h2>
+            <p className="text-sm text-muted-foreground capitalize font-medium">{user.role}</p>
           </div>
         </button>
       </SidebarHeader>
 
-      <SidebarContent className="p-4">
+      <SidebarContent className="p-6">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
+          <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground/80 uppercase tracking-wider mb-4 px-3">
             Navegación
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
+            <SidebarMenu className="space-y-2">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink 
                       to={item.url} 
                       end 
-                      className={getNavClassName}
+                      className={`${getNavClassName} rounded-xl p-3 border transition-all duration-200 flex items-center gap-3 font-medium`}
                     >
-                      <item.icon className="h-5 w-5 mr-3" />
+                      <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
@@ -118,42 +120,42 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-4">
+      <SidebarFooter className="border-t border-border/50 p-6">
         <div className="relative" ref={dropdownRef}>
           {/* Profile Button - Clickeable */}
           <button
             onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="flex items-center gap-3 w-full p-3 hover:bg-gray-50 rounded-xl transition-all duration-200 group"
+            className="flex items-center gap-3 w-full p-3 hover:bg-accent/60 rounded-xl transition-all duration-200 group"
           >
             <img 
               src={user.avatar} 
               alt={user.name}
-              className="h-10 w-10 rounded-full ring-2 ring-gray-100 group-hover:ring-blue-200 transition-all"
+              className="h-11 w-11 rounded-xl ring-2 ring-border group-hover:ring-primary/30 transition-all shadow-sm"
             />
             <div className="flex-1 min-w-0 text-left">
-              <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
-              <p className="text-xs text-gray-500 truncate">{user.email}</p>
+              <p className="text-sm font-semibold text-foreground truncate">{user.name}</p>
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
-            <div className="text-gray-400 group-hover:text-gray-600 transition-colors">
+            <div className="text-muted-foreground group-hover:text-foreground transition-colors">
               {isProfileOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </div>
           </button>
 
           {/* Dropdown Menu */}
           {isProfileOpen && (
-            <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
+            <div className="absolute bottom-full left-0 right-0 mb-3 bg-card/95 backdrop-blur-sm rounded-xl shadow-card-hover border border-border/50 z-50 overflow-hidden">
               {/* User Info Header */}
-              <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-purple-50">
+              <div className="p-4 border-b border-border/50 bg-gradient-to-r from-primary/5 to-accent/30">
                 <div className="flex items-center gap-3">
                   <img 
                     src={user.avatar} 
                     alt={user.name}
-                    className="h-12 w-12 rounded-full ring-2 ring-blue-200"
+                    className="h-12 w-12 rounded-xl ring-2 ring-primary/20 shadow-sm"
                   />
                   <div>
-                    <h3 className="font-semibold text-gray-900">{user.name}</h3>
-                    <p className="text-sm text-gray-600">{user.email}</p>
-                    <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full mt-1">
+                    <h3 className="font-semibold text-foreground">{user.name}</h3>
+                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                    <span className="inline-block px-2 py-1 text-xs font-medium bg-primary/10 text-primary rounded-lg mt-1">
                       {user.role === 'teacher' ? 'Profesor' : 'Estudiante'}
                     </span>
                   </div>
@@ -164,32 +166,32 @@ export function AppSidebar() {
               <div className="py-2">
                 <button 
                   onClick={() => handleNavigate('/profile')}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-accent/60 transition-colors"
                 >
-                  <UserCircle className="h-4 w-4 text-gray-500" />
+                  <UserCircle className="h-4 w-4 text-muted-foreground" />
                   <span>Mi Perfil</span>
                 </button>
                 
                 {user.role === 'teacher' && (
                   <button 
                     onClick={() => handleNavigate('/billing')}
-                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-accent/60 transition-colors"
                   >
-                    <CreditCard className="h-4 w-4 text-gray-500" />
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
                     <span>Facturación</span>
                   </button>
                 )}
                 
-                <button className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                  <HelpCircle className="h-4 w-4 text-gray-500" />
+                <button className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-accent/60 transition-colors">
+                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
                   <span>Ayuda</span>
                 </button>
                 
-                <div className="border-t border-gray-100 my-1"></div>
+                <div className="border-t border-border/50 my-1"></div>
                 
                 <button
                   onClick={logout}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   <LogOut className="h-4 w-4" />
                   <span>Cerrar Sesión</span>
