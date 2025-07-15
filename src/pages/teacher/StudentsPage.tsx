@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Users, User, TrendingUp, DollarSign, UserPlus, Copy, Clock } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+import { Plus, Search, Users, User, TrendingUp, DollarSign, UserPlus, Copy, Clock, Mail, Phone, Calendar, Settings, MoreVertical, MessageCircle, Video } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -299,34 +300,79 @@ export const StudentsPage: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredStudents.map((student) => (
-                <Card key={student.id} className="bg-white/80 backdrop-blur-sm border-muted hover:shadow-lg transition-all duration-300 hover:scale-105">
-                  <div className="p-6">
-                    <div className="flex items-center gap-4 mb-4">
+                <Card key={student.id} className="bg-white/90 backdrop-blur-sm border-white/20 hover:shadow-xl transition-all duration-300 hover:scale-105 group">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-4">
                       <StudentAvatar student={student} />
                       <div className="flex-1">
-                        <h3 className="font-bold text-foreground text-lg">{student.name}</h3>
-                        <p className="text-sm text-muted-foreground">{student.email}</p>
-                        <span className="inline-block mt-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
-                          {student.level}
-                        </span>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-foreground text-lg">{student.name}</h3>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <MessageCircle className="h-4 w-4 mr-2" />
+                                Enviar mensaje
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Video className="h-4 w-4 mr-2" />
+                                Programar clase
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Settings className="h-4 w-4 mr-2" />
+                                Configurar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          {student.email}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="inline-block text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                            {student.level}
+                          </span>
+                          <span className={`inline-block text-xs font-medium px-2 py-1 rounded-full ${
+                            student.isRegistered 
+                              ? 'text-green-700 bg-green-50' 
+                              : 'text-orange-700 bg-orange-50'
+                          }`}>
+                            {student.status}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  </CardHeader>
 
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Estado:</span>
-                        <span className={`font-medium ${student.isRegistered ? 'text-green-600' : 'text-orange-600'}`}>
-                          {student.status}
+                  <CardContent className="pt-0">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Registrado:
                         </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Registrado:</span>
                         <span className="font-medium text-foreground">
                           {new Date(student.joinDate).toLocaleDateString('es-ES')}
                         </span>
                       </div>
+                      
+                      <div className="flex gap-2 pt-2">
+                        <Button size="sm" variant="outline" className="flex-1 h-8 text-xs">
+                          <MessageCircle className="h-3 w-3 mr-1" />
+                          Contactar
+                        </Button>
+                        <Button size="sm" className="flex-1 h-8 text-xs">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          Programar
+                        </Button>
+                      </div>
                     </div>
-                  </div>
+                  </CardContent>
                 </Card>
               ))}
             </div>

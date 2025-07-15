@@ -15,6 +15,7 @@ import { es } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useClasses } from '@/contexts/ClassesContext';
 
 interface CreateStudentFormProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { refreshClasses } = useClasses();
   
   // Student form data
   const [studentName, setStudentName] = useState('');
@@ -124,7 +126,7 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
           throw new Error(`Error al crear el estudiante: ${studentError.message}`);
         }
 
-        // For existing users, we can create the class directly if requested
+        // Create the class if requested (for existing users)
         if (scheduleClass && classDate && classTime && topic) {
           const { error: classError } = await supabase
             .from('classes')
@@ -165,7 +167,30 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
           throw new Error(`Error al crear la invitación: ${invitationError.message}`);
         }
 
-        console.log('Invitation created:', invitationData);
+        // Create the class even for invitations (it will be pending until they register)
+        if (scheduleClass && classDate && classTime && topic) {
+          const { error: classError } = await supabase
+            .from('classes')
+            .insert({
+              teacher_id: user.id,
+              student_name: studentName,
+              student_email: studentEmail,
+              student_level: studentLevel,
+              class_date: classDate.toISOString().split('T')[0],
+              class_time: classTime,
+              duration: parseInt(duration),
+              topic: topic,
+              meeting_link: meetingLink || null,
+              notes: notes || null,
+              status: 'Pendiente', // Different status for invited students
+              payment_status: 'No Pagado'
+            });
+
+          if (classError) {
+            console.error('Class creation error:', classError);
+            throw new Error(`Error al programar la clase: ${classError.message}`);
+          }
+        }
       }
 
       toast({
@@ -178,6 +203,10 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
       resetForm();
       onOpenChange(false);
       onStudentCreated();
+      // Refresh classes context if a class was created
+      if (scheduleClass) {
+        await refreshClasses();
+      }
 
     } catch (error: any) {
       console.error('Error creating student:', error);
