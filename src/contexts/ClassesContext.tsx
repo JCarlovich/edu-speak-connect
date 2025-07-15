@@ -47,8 +47,14 @@ export const ClassesProvider: React.FC<{ children: ReactNode }> = ({ children })
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (userError || !user) {
+      if (userError) {
         console.error('Error getting user:', userError);
+        setClasses([]);
+        return;
+      }
+
+      if (!user) {
+        // No user logged in, this is expected on auth page
         setClasses([]);
         return;
       }

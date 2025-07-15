@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Users, User, TrendingUp, DollarSign, UserPlus, Copy, Clock, Mail, Phone, Calendar, Settings, MoreVertical, MessageCircle, Video, X, BookOpen } from 'lucide-react';
+import { Plus, Search, Users, User, TrendingUp, DollarSign, UserPlus, Copy, Clock, Mail, Phone, Calendar, Settings, MoreVertical, MessageCircle, Video, X, BookOpen, Star, Award, CheckCircle, AlertCircle, Euro } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -65,19 +66,43 @@ export const StudentsPage: React.FC = () => {
         return;
       }
 
-      // Transform registered students
-      const registeredStudents = studentsData.map(student => ({
-        id: student.id,
-        name: student.profiles.full_name,
-        email: student.profiles.email,
-        avatar: student.profiles.avatar_url,
-        level: student.grade || 'Básico',
-        status: 'Registrado',
-        nextClass: null,
-        totalClasses: 0,
-        completedClasses: 0,
-        type: 'registered'
-      }));
+      // Get classes data to calculate stats
+      const { data: classesData, error: classesError } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('teacher_id', user.id);
+
+      if (classesError) {
+        console.error('Error fetching classes:', classesError);
+      }
+
+      // Transform registered students with stats
+      const registeredStudents = studentsData.map(student => {
+        const studentClasses = classesData?.filter(cls => cls.student_email === student.profiles.email) || [];
+        const completedClasses = studentClasses.filter(cls => cls.status === 'Completada');
+        const paidClasses = studentClasses.filter(cls => cls.payment_status === 'Pagado');
+        const nextClass = studentClasses
+          .filter(cls => cls.status === 'Programada' && new Date(cls.class_date) >= new Date())
+          .sort((a, b) => new Date(a.class_date).getTime() - new Date(b.class_date).getTime())[0];
+
+        return {
+          id: student.id,
+          name: student.profiles.full_name,
+          email: student.profiles.email,
+          avatar: student.profiles.avatar_url,
+          level: student.grade || 'Básico',
+          status: 'Registrado',
+          phone: '+34 612 345 678', // Mock data - you can add this to profiles table later
+          joinDate: student.created_at,
+          nextClass: nextClass ? `${nextClass.class_date} ${nextClass.class_time}` : null,
+          totalClasses: studentClasses.length,
+          completedClasses: completedClasses.length,
+          paidClasses: paidClasses.length,
+          unpaidClasses: studentClasses.length - paidClasses.length,
+          averageScore: 8.5, // Mock data - you can add scoring system later
+          type: 'registered'
+        };
+      });
 
       // Transform pending invitations
       const pendingStudents = invitationsData.map(invitation => ({
@@ -87,9 +112,14 @@ export const StudentsPage: React.FC = () => {
         avatar: null,
         level: invitation.student_level || 'Básico',
         status: 'Invitación Pendiente',
+        phone: null,
+        joinDate: invitation.created_at,
         nextClass: null,
         totalClasses: 0,
         completedClasses: 0,
+        paidClasses: 0,
+        unpaidClasses: 0,
+        averageScore: 0,
         type: 'invitation'
       }));
 
@@ -123,8 +153,20 @@ export const StudentsPage: React.FC = () => {
   };
 
   // Avatar component with fallback to initials
-  const StudentAvatar = ({ student }: { student: any }) => {
+  const StudentAvatar = ({ student, size = 'md' }: { student: any, size?: 'sm' | 'md' | 'lg' }) => {
     const [imageError, setImageError] = useState(false);
+    
+    const sizeClasses = {
+      sm: 'w-10 h-10',
+      md: 'w-16 h-16',
+      lg: 'w-20 h-20'
+    };
+
+    const textSizes = {
+      sm: 'text-sm',
+      md: 'text-lg',
+      lg: 'text-xl'
+    };
     
     if (!student.avatar || imageError) {
       const initials = getInitials(student.name);
@@ -143,8 +185,8 @@ export const StudentsPage: React.FC = () => {
       const gradientClass = colors[colorIndex];
       
       return (
-        <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${gradientClass} flex items-center justify-center ring-2 ring-white shadow-md`}>
-          <span className="text-white font-bold text-lg">{initials}</span>
+        <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br ${gradientClass} flex items-center justify-center ring-2 ring-white shadow-md`}>
+          <span className={`text-white font-bold ${textSizes[size]}`}>{initials}</span>
         </div>
       );
     }
@@ -153,7 +195,7 @@ export const StudentsPage: React.FC = () => {
       <img
         src={student.avatar}
         alt={student.name}
-        className="w-16 h-16 rounded-full object-cover ring-2 ring-white shadow-md"
+        className={`${sizeClasses[size]} rounded-full object-cover ring-2 ring-white shadow-md`}
         onError={() => setImageError(true)}
       />
     );
@@ -169,6 +211,15 @@ export const StudentsPage: React.FC = () => {
     } catch (error) {
       console.error('Error copying to clipboard:', error);
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
   };
 
   return (
@@ -287,53 +338,155 @@ export const StudentsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Students Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Students Grid - Enhanced Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredStudents.map((student) => (
-              <Card key={student.id} className="bg-white/80 backdrop-blur-sm border-muted hover:shadow-lg transition-all duration-300 group cursor-pointer"
+              <Card key={student.id} className="bg-white/90 backdrop-blur-sm border-muted hover:shadow-xl transition-all duration-300 group cursor-pointer overflow-hidden"
                     onClick={() => setSelectedStudent(student)}>
-                <div className="p-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <StudentAvatar student={student} />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                        {student.name}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">{student.email}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          student.level === 'Básico' ? 'bg-blue-100 text-blue-700' :
-                          student.level === 'Intermedio' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-green-100 text-green-700'
-                        }`}>
-                          {student.level}
-                        </span>
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          student.status === 'Registrado' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                        }`}>
-                          {student.status}
-                        </span>
+                
+                {/* Card Header with gradient */}
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 border-b">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <StudentAvatar student={student} size="md" />
+                      <div>
+                        <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors text-lg">
+                          {student.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">{student.email}</p>
+                      </div>
+                    </div>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <MessageCircle className="h-4 w-4 mr-2" />
+                          Enviar mensaje
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Programar clase
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Video className="h-4 w-4 mr-2" />
+                          Videollamada
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                {/* Card Content */}
+                <CardContent className="p-4 space-y-4">
+                  {/* Status and Level Badges */}
+                  <div className="flex items-center gap-2">
+                    <Badge variant={student.status === 'Registrado' ? 'default' : 'secondary'} className="text-xs">
+                      {student.status === 'Registrado' ? (
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                      ) : (
+                        <Clock className="h-3 w-3 mr-1" />
+                      )}
+                      {student.status}
+                    </Badge>
+                    <Badge variant="outline" className={`text-xs ${
+                      student.level === 'Básico' ? 'border-blue-200 text-blue-700 bg-blue-50' :
+                      student.level === 'Intermedio' ? 'border-yellow-200 text-yellow-700 bg-yellow-50' :
+                      'border-green-200 text-green-700 bg-green-50'
+                    }`}>
+                      <BookOpen className="h-3 w-3 mr-1" />
+                      {student.level}
+                    </Badge>
+                  </div>
+
+                  {/* Statistics Grid */}
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Calendar className="h-4 w-4 text-blue-600" />
+                        <span className="text-gray-600">Clases</span>
+                      </div>
+                      <div className="font-semibold text-gray-900">
+                        {student.completedClasses}/{student.totalClasses}
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Euro className="h-4 w-4 text-green-600" />
+                        <span className="text-gray-600">Pagadas</span>
+                      </div>
+                      <div className="font-semibold text-gray-900">
+                        {student.paidClasses}
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center justify-between pt-4 border-t border-muted">
-                    <div className="text-sm text-muted-foreground">
-                      Próxima clase: {student.nextClass || 'Sin programar'}
+
+                  {/* Performance */}
+                  {student.status === 'Registrado' && (
+                    <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500" />
+                          <span className="text-sm text-gray-600">Promedio</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-bold text-lg">{student.averageScore}</span>
+                          <span className="text-sm text-gray-500">/10</span>
+                        </div>
+                      </div>
                     </div>
+                  )}
+
+                  {/* Next Class or Join Date */}
+                  <div className="pt-2 border-t border-gray-100">
+                    {student.nextClass ? (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="h-4 w-4 text-blue-600" />
+                        <span className="text-gray-600">Próxima:</span>
+                        <span className="font-medium">{formatDate(student.nextClass.split(' ')[0])}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="h-4 w-4 text-gray-400" />
+                        <span className="text-gray-600">
+                          {student.status === 'Registrado' ? 'Sin clases programadas' : `Invitado el ${formatDate(student.joinDate)}`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="flex gap-2 pt-2">
                     <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      size="sm" 
+                      className="flex-1 text-xs"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedStudent(student);
+                        // Programar clase action
                       }}
                     >
-                      Ver perfil
+                      <Calendar className="h-3 w-3 mr-1" />
+                      Clase
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="flex-1 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Mensaje action
+                      }}
+                    >
+                      <Mail className="h-3 w-3 mr-1" />
+                      Mensaje
                     </Button>
                   </div>
-                </div>
+                </CardContent>
               </Card>
             ))}
           </div>
@@ -370,7 +523,7 @@ export const StudentsPage: React.FC = () => {
       {/* Student Detail Modal */}
       {selectedStudent && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white rounded-t-2xl border-b p-6 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-foreground">Perfil de Estudiante</h2>
               <Button
@@ -384,90 +537,140 @@ export const StudentsPage: React.FC = () => {
             </div>
             
             <div className="p-6 space-y-6">
-              {/* Header with Avatar */}
+              {/* Header with Avatar and Basic Info */}
               <div className="flex items-center gap-6">
-                <StudentAvatar student={selectedStudent} />
+                <StudentAvatar student={selectedStudent} size="lg" />
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-foreground mb-1">
+                  <h3 className="text-2xl font-semibold text-foreground mb-2">
                     {selectedStudent.name}
                   </h3>
-                  <p className="text-muted-foreground mb-2">{selectedStudent.email}</p>
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
-                      selectedStudent.level === 'Básico' ? 'bg-blue-100 text-blue-700' :
-                      selectedStudent.level === 'Intermedio' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-green-100 text-green-700'
-                    }`}>
-                      <BookOpen className="h-4 w-4" />
-                      {selectedStudent.level}
-                    </span>
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
-                      selectedStudent.status === 'Registrado' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                    }`}>
-                      <User className="h-4 w-4" />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Mail className="h-4 w-4" />
+                      {selectedStudent.email}
+                    </div>
+                    {selectedStudent.phone && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Phone className="h-4 w-4" />
+                        {selectedStudent.phone}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-3">
+                    <Badge variant={selectedStudent.status === 'Registrado' ? 'default' : 'secondary'}>
+                      {selectedStudent.status === 'Registrado' ? (
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                      ) : (
+                        <Clock className="h-3 w-3 mr-1" />
+                      )}
                       {selectedStudent.status}
-                    </span>
+                    </Badge>
+                    <Badge variant="outline" className={`${
+                      selectedStudent.level === 'Básico' ? 'border-blue-200 text-blue-700 bg-blue-50' :
+                      selectedStudent.level === 'Intermedio' ? 'border-yellow-200 text-yellow-700 bg-yellow-50' :
+                      'border-green-200 text-green-700 bg-green-50'
+                    }`}>
+                      <BookOpen className="h-4 w-4 mr-1" />
+                      {selectedStudent.level}
+                    </Badge>
                   </div>
                 </div>
               </div>
 
-              {/* Information Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="p-4">
-                  <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Información de Clases
-                  </h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Próxima clase:</span>
-                      <span className="font-medium">{selectedStudent.nextClass || 'Sin programar'}</span>
+              {/* Statistics Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="p-4 bg-blue-50 border-blue-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <Calendar className="h-5 w-5 text-blue-600" />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total clases:</span>
-                      <span className="font-medium">{selectedStudent.totalClasses || 0}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Clases completadas:</span>
-                      <span className="font-medium">{selectedStudent.completedClasses || 0}</span>
+                    <div>
+                      <p className="text-sm text-blue-600 font-medium">Total de Clases</p>
+                      <p className="text-2xl font-bold text-blue-900">{selectedStudent.totalClasses}</p>
                     </div>
                   </div>
                 </Card>
 
-                <Card className="p-4">
-                  <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Contacto
-                  </h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Email:</span>
-                      <span className="font-medium">{selectedStudent.email}</span>
+                <Card className="p-4 bg-green-50 border-green-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Estado:</span>
-                      <span className={`font-medium ${
-                        selectedStudent.status === 'Registrado' ? 'text-green-600' : 'text-orange-600'
-                      }`}>
-                        {selectedStudent.status}
-                      </span>
+                    <div>
+                      <p className="text-sm text-green-600 font-medium">Completadas</p>
+                      <p className="text-2xl font-bold text-green-900">{selectedStudent.completedClasses}</p>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-4 bg-purple-50 border-purple-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                      <Star className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-purple-600 font-medium">Promedio</p>
+                      <p className="text-2xl font-bold text-purple-900">{selectedStudent.averageScore}/10</p>
                     </div>
                   </div>
                 </Card>
               </div>
 
+              {/* Payment Information */}
+              {selectedStudent.status === 'Registrado' && (
+                <Card className="p-4">
+                  <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                    <Euro className="h-4 w-4" />
+                    Estado de Pagos
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Clases pagadas:</span>
+                      <span className="font-medium text-green-600">{selectedStudent.paidClasses}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Clases pendientes:</span>
+                      <span className="font-medium text-orange-600">{selectedStudent.unpaidClasses}</span>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Next Class Information */}
+              <Card className="p-4">
+                <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Información de Clases
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Próxima clase:</span>
+                    <span className="font-medium">{selectedStudent.nextClass || 'Sin programar'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Fecha de registro:</span>
+                    <span className="font-medium">{formatDate(selectedStudent.joinDate)}</span>
+                  </div>
+                </div>
+              </Card>
+
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t">
-                <Button className="flex-1">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Programar Clase
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t">
+                <Button className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Nueva Clase
                 </Button>
-                <Button variant="outline" className="flex-1">
-                  <Mail className="h-4 w-4 mr-2" />
-                  Enviar Mensaje
+                <Button variant="outline" className="flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4" />
+                  Mensaje
                 </Button>
-                <Button variant="outline">
-                  <MoreVertical className="h-4 w-4" />
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Video className="h-4 w-4" />
+                  Videollamada
+                </Button>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  Configurar
                 </Button>
               </div>
             </div>
