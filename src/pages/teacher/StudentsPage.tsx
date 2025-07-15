@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Users, User, TrendingUp, DollarSign, UserPlus, Copy, Clock, Mail, Phone, Calendar, Settings, MoreVertical, MessageCircle, Video } from 'lucide-react';
+import { Plus, Search, Users, User, TrendingUp, DollarSign, UserPlus, Copy, Clock, Mail, Phone, Calendar, Settings, MoreVertical, MessageCircle, Video, X, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -17,6 +17,7 @@ export const StudentsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [teacherCode, setTeacherCode] = useState<string>('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
 
   const fetchStudents = async () => {
     if (!user || user.role !== 'teacher') return;
@@ -49,49 +50,54 @@ export const StudentsPage: React.FC = () => {
 
       if (studentsError) {
         console.error('Error fetching students:', studentsError);
+        return;
       }
 
       // Get pending invitations
       const { data: invitationsData, error: invitationsError } = await supabase
         .from('student_invitations')
         .select('*')
-        .eq('teacher_id', user.id);
+        .eq('teacher_id', user.id)
+        .eq('is_accepted', false);
 
       if (invitationsError) {
         console.error('Error fetching invitations:', invitationsError);
+        return;
       }
 
-      // Transform registered students data
-      const transformedStudents = (studentsData || []).map(student => ({
+      // Transform registered students
+      const registeredStudents = studentsData.map(student => ({
         id: student.id,
         name: student.profiles.full_name,
         email: student.profiles.email,
+        avatar: student.profiles.avatar_url,
         level: student.grade || 'Básico',
-        joinDate: student.created_at.split('T')[0],
-        status: 'Activo',
-        avatar: student.profiles.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${student.profiles.email}`,
-        isRegistered: true,
-        type: 'student'
+        status: 'Registrado',
+        nextClass: null,
+        totalClasses: 0,
+        completedClasses: 0,
+        type: 'registered'
       }));
 
-      // Transform invitation data
-      const transformedInvitations = (invitationsData || []).map(invitation => ({
+      // Transform pending invitations
+      const pendingStudents = invitationsData.map(invitation => ({
         id: invitation.id,
         name: invitation.student_name,
         email: invitation.student_email,
+        avatar: null,
         level: invitation.student_level || 'Básico',
-        joinDate: invitation.created_at.split('T')[0],
-        status: 'Pendiente de Registro',
-        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${invitation.student_email}`,
-        isRegistered: false,
+        status: 'Invitación Pendiente',
+        nextClass: null,
+        totalClasses: 0,
+        completedClasses: 0,
         type: 'invitation'
       }));
 
       // Combine both arrays
-      const allStudents = [...transformedStudents, ...transformedInvitations];
-      setStudents(allStudents);
+      setStudents([...registeredStudents, ...pendingStudents]);
+
     } catch (error) {
-      console.error('Error fetching students:', error);
+      console.error('Error in fetchStudents:', error);
     } finally {
       setIsLoading(false);
     }
@@ -206,11 +212,13 @@ export const StudentsPage: React.FC = () => {
             <Card className="bg-white/80 backdrop-blur-sm border-muted p-6">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-lg bg-green-50 flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-green-600" />
+                  <User className="h-6 w-6 text-green-600" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Registrados</p>
-                  <p className="text-2xl font-bold text-foreground">{students.filter(s => s.isRegistered).length}</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {students.filter(s => s.status === 'Registrado').length}
+                  </p>
                 </div>
               </div>
             </Card>
@@ -222,7 +230,9 @@ export const StudentsPage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Pendientes</p>
-                  <p className="text-2xl font-bold text-foreground">{students.filter(s => !s.isRegistered).length}</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {students.filter(s => s.status === 'Invitación Pendiente').length}
+                  </p>
                 </div>
               </div>
             </Card>
@@ -230,161 +240,239 @@ export const StudentsPage: React.FC = () => {
             <Card className="bg-white/80 backdrop-blur-sm border-muted p-6">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-lg bg-purple-50 flex items-center justify-center">
-                  <DollarSign className="h-6 w-6 text-purple-600" />
+                  <TrendingUp className="h-6 w-6 text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Nuevos este mes</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {students.filter(s => {
-                      const joinDate = new Date(s.joinDate);
-                      const now = new Date();
-                      return joinDate.getMonth() === now.getMonth() && joinDate.getFullYear() === now.getFullYear();
-                    }).length}
-                  </p>
+                  <p className="text-sm text-muted-foreground">Crecimiento</p>
+                  <p className="text-2xl font-bold text-foreground">+12%</p>
                 </div>
               </div>
             </Card>
           </div>
 
+          {/* Teacher Code Section */}
+          <Card className="bg-white/80 backdrop-blur-sm border-muted p-6 mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground mb-1">Tu Código de Profesor</h3>
+                <p className="text-muted-foreground">Comparte este código con tus estudiantes para que puedan registrarse</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-gradient-primary text-white px-6 py-3 rounded-lg font-mono text-xl font-bold tracking-wider">
+                  {teacherCode}
+                </div>
+                <Button 
+                  variant="outline"
+                  onClick={copyTeacherCode}
+                  className="flex items-center gap-2"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar
+                </Button>
+              </div>
+            </div>
+          </Card>
+
           {/* Search */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 mb-8">
+          <div className="mb-6">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 type="text"
-                placeholder="Buscar estudiantes por nombre o email..."
-                className="pl-12 h-12 rounded-xl border-muted focus:border-primary focus:ring-primary/20 transition-all"
+                placeholder="Buscar estudiantes..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
               />
             </div>
           </div>
 
           {/* Students Grid */}
-          {filteredStudents.length === 0 ? (
-            <Card className="bg-white/80 backdrop-blur-sm border-muted p-12 text-center">
-              <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                {students.length === 0 ? 'No tienes estudiantes registrados' : 'No se encontraron estudiantes'}
-              </h3>
-              <p className="text-muted-foreground mb-6">
-                {students.length === 0 
-                  ? 'Comienza creando tu primer estudiante usando el botón "Dar de Alta Estudiante".'
-                  : 'Intenta con otros términos de búsqueda.'
-                }
-              </p>
-              {students.length === 0 && teacherCode && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
-                  <p className="text-sm text-blue-800 mb-2">
-                    <strong>Tu código de profesor:</strong>
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <code className="bg-blue-100 text-blue-900 px-3 py-2 rounded font-mono text-lg font-bold">
-                      {teacherCode}
-                    </code>
-                    <Button
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredStudents.map((student) => (
+              <Card key={student.id} className="bg-white/80 backdrop-blur-sm border-muted hover:shadow-lg transition-all duration-300 group cursor-pointer"
+                    onClick={() => setSelectedStudent(student)}>
+                <div className="p-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <StudentAvatar student={student} />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                        {student.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">{student.email}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          student.level === 'Básico' ? 'bg-blue-100 text-blue-700' :
+                          student.level === 'Intermedio' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-green-100 text-green-700'
+                        }`}>
+                          {student.level}
+                        </span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          student.status === 'Registrado' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {student.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between pt-4 border-t border-muted">
+                    <div className="text-sm text-muted-foreground">
+                      Próxima clase: {student.nextClass || 'Sin programar'}
+                    </div>
+                    <Button 
+                      variant="outline" 
                       size="sm"
-                      variant="outline"
-                      onClick={copyTeacherCode}
-                      className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedStudent(student);
+                      }}
                     >
-                      <Copy className="h-4 w-4" />
+                      Ver perfil
                     </Button>
                   </div>
-                  <p className="text-xs text-blue-600 mt-2">
-                    Usa el botón "Dar de Alta Estudiante" para crear estudiantes y enviarles invitaciones automáticamente.
-                  </p>
                 </div>
-              )}
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredStudents.map((student) => (
-                <Card key={student.id} className="bg-white/90 backdrop-blur-sm border-white/20 hover:shadow-xl transition-all duration-300 hover:scale-105 group">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-4">
-                      <StudentAvatar student={student} />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-bold text-foreground text-lg">{student.name}</h3>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
-                                <MessageCircle className="h-4 w-4 mr-2" />
-                                Enviar mensaje
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Video className="h-4 w-4 mr-2" />
-                                Programar clase
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Settings className="h-4 w-4 mr-2" />
-                                Configurar
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          {student.email}
-                        </p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="inline-block text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
-                            {student.level}
-                          </span>
-                          <span className={`inline-block text-xs font-medium px-2 py-1 rounded-full ${
-                            student.isRegistered 
-                              ? 'text-green-700 bg-green-50' 
-                              : 'text-orange-700 bg-orange-50'
-                          }`}>
-                            {student.status}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
+              </Card>
+            ))}
+          </div>
 
-                  <CardContent className="pt-0">
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          Registrado:
-                        </span>
-                        <span className="font-medium text-foreground">
-                          {new Date(student.joinDate).toLocaleDateString('es-ES')}
-                        </span>
-                      </div>
-                      
-                      <div className="flex gap-2 pt-2">
-                        <Button size="sm" variant="outline" className="flex-1 h-8 text-xs">
-                          <MessageCircle className="h-3 w-3 mr-1" />
-                          Contactar
-                        </Button>
-                        <Button size="sm" className="flex-1 h-8 text-xs">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          Programar
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+          {/* Empty State */}
+          {filteredStudents.length === 0 && !isLoading && (
+            <div className="text-center py-12">
+              <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">No hay estudiantes</h3>
+              <p className="text-muted-foreground mb-4">
+                {searchTerm ? 'No se encontraron estudiantes con ese término de búsqueda.' : 'Aún no tienes estudiantes registrados.'}
+              </p>
+              {!searchTerm && (
+                <Button onClick={() => setIsCreateDialogOpen(true)}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Dar de Alta Primer Estudiante
+                </Button>
+              )}
             </div>
           )}
-
-          {/* Create Student Dialog */}
-          <CreateStudentForm
-            isOpen={isCreateDialogOpen}
-            onOpenChange={setIsCreateDialogOpen}
-            onStudentCreated={fetchStudents}
-          />
         </>
+      )}
+
+      {/* Create Student Dialog */}
+      <CreateStudentForm 
+        isOpen={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onStudentCreated={() => {
+          setIsCreateDialogOpen(false);
+          fetchStudents();
+        }}
+      />
+
+      {/* Student Detail Modal */}
+      {selectedStudent && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white rounded-t-2xl border-b p-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-foreground">Perfil de Estudiante</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedStudent(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* Header with Avatar */}
+              <div className="flex items-center gap-6">
+                <StudentAvatar student={selectedStudent} />
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-foreground mb-1">
+                    {selectedStudent.name}
+                  </h3>
+                  <p className="text-muted-foreground mb-2">{selectedStudent.email}</p>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
+                      selectedStudent.level === 'Básico' ? 'bg-blue-100 text-blue-700' :
+                      selectedStudent.level === 'Intermedio' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-green-100 text-green-700'
+                    }`}>
+                      <BookOpen className="h-4 w-4" />
+                      {selectedStudent.level}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${
+                      selectedStudent.status === 'Registrado' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                    }`}>
+                      <User className="h-4 w-4" />
+                      {selectedStudent.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Information Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="p-4">
+                  <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Información de Clases
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Próxima clase:</span>
+                      <span className="font-medium">{selectedStudent.nextClass || 'Sin programar'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total clases:</span>
+                      <span className="font-medium">{selectedStudent.totalClasses || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Clases completadas:</span>
+                      <span className="font-medium">{selectedStudent.completedClasses || 0}</span>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-4">
+                  <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Contacto
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Email:</span>
+                      <span className="font-medium">{selectedStudent.email}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Estado:</span>
+                      <span className={`font-medium ${
+                        selectedStudent.status === 'Registrado' ? 'text-green-600' : 'text-orange-600'
+                      }`}>
+                        {selectedStudent.status}
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t">
+                <Button className="flex-1">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Programar Clase
+                </Button>
+                <Button variant="outline" className="flex-1">
+                  <Mail className="h-4 w-4 mr-2" />
+                  Enviar Mensaje
+                </Button>
+                <Button variant="outline">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
