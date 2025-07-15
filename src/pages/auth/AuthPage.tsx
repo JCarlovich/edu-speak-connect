@@ -71,11 +71,6 @@ export const AuthPage = () => {
       return;
     }
 
-    if (registerRole === 'student' && !teacherCode) {
-      setError('Los estudiantes deben ingresar el código del profesor');
-      setIsLoading(false);
-      return;
-    }
 
     try {
       // Generate teacher code for teachers
@@ -93,7 +88,7 @@ export const AuthPage = () => {
           data: {
             full_name: registerFullName,
             role: registerRole,
-            teacher_code: registerRole === 'teacher' ? generatedTeacherCode : teacherCode,
+            teacher_code: registerRole === 'teacher' ? generatedTeacherCode : undefined,
             school_name: schoolName,
             subject: subject,
             grade: grade,
@@ -300,37 +295,20 @@ export const AuthPage = () => {
 
                 {/* Student-specific fields */}
                 {registerRole === 'student' && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="teacher-code">Código del Profesor</Label>
-                      <div className="relative">
-                        <Hash className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="teacher-code"
-                          type="text"
-                          placeholder="PROF123456"
-                          value={teacherCode}
-                          onChange={(e) => setTeacherCode(e.target.value.toUpperCase())}
-                          className="pl-10"
-                          required
-                        />
-                      </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="grade">Grado/Curso (Opcional)</Label>
+                    <div className="relative">
+                      <GraduationCap className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="grade"
+                        type="text"
+                        placeholder="Ej: 5to Grado, 2do Bachillerato"
+                        value={grade}
+                        onChange={(e) => setGrade(e.target.value)}
+                        className="pl-10"
+                      />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="grade">Grado/Curso (Opcional)</Label>
-                      <div className="relative">
-                        <GraduationCap className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="grade"
-                          type="text"
-                          placeholder="Ej: 5to Grado, 2do Bachillerato"
-                          value={grade}
-                          onChange={(e) => setGrade(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-                  </>
+                  </div>
                 )}
 
                 {error && (

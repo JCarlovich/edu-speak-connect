@@ -1,73 +1,143 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Users, User, TrendingUp, DollarSign } from 'lucide-react';
+import { Plus, Search, Users, User, TrendingUp, DollarSign, UserPlus, Copy } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 export const StudentsPage: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [students, setStudents] = useState<any[]>([]);
+  const [unassignedStudents, setUnassignedStudents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [teacherCode, setTeacherCode] = useState<string>('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState('');
+
+  const fetchStudents = async () => {
+    if (!user || user.role !== 'teacher') return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Get teacher's code first
+      const { data: teacherData, error: teacherError } = await supabase
+        .from('teachers')
+        .select('teacher_code')
+        .eq('id', user.id)
+        .single();
+
+      if (teacherError) {
+        console.error('Error fetching teacher data:', teacherError);
+        return;
+      }
+
+      setTeacherCode(teacherData.teacher_code);
+
+      // Get students with teacher's code
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
+        .select(`
+          *,
+          profiles!inner(id, email, full_name, avatar_url)
+        `)
+        .eq('teacher_code', teacherData.teacher_code);
+
+      if (studentsError) {
+        console.error('Error fetching students:', studentsError);
+        return;
+      }
+
+      // Transform data to match expected format
+      const transformedStudents = studentsData.map(student => ({
+        id: student.id,
+        name: student.profiles.full_name,
+        email: student.profiles.email,
+        level: student.grade || 'Básico',
+        joinDate: student.created_at.split('T')[0],
+        status: 'Activo',
+        avatar: student.profiles.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${student.profiles.email}`,
+      }));
+
+      setStudents(transformedStudents);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchUnassignedStudents = async () => {
+    try {
+      // Get students with 'UNASSIGNED' teacher code
+      const { data: unassignedData, error: unassignedError } = await supabase
+        .from('students')
+        .select(`
+          *,
+          profiles!inner(id, email, full_name, avatar_url)
+        `)
+        .eq('teacher_code', 'UNASSIGNED');
+
+      if (unassignedError) {
+        console.error('Error fetching unassigned students:', unassignedError);
+        return;
+      }
+
+      const formattedUnassigned = unassignedData?.map(student => ({
+        id: student.id,
+        name: student.profiles.full_name || 'Usuario',
+        email: student.profiles.email || '',
+        grade: student.grade || 'Sin grado'
+      })) || [];
+
+      setUnassignedStudents(formattedUnassigned);
+    } catch (error) {
+      console.error('Error in fetchUnassignedStudents:', error);
+    }
+  };
+
+  const assignStudent = async () => {
+    if (!selectedStudent || !teacherCode) return;
+
+    try {
+      const { error } = await supabase
+        .from('students')
+        .update({ teacher_code: teacherCode })
+        .eq('id', selectedStudent);
+
+      if (error) {
+        console.error('Error assigning student:', error);
+        toast({
+          title: "Error",
+          description: "No se pudo asignar el estudiante",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Estudiante asignado",
+        description: "El estudiante ha sido añadido a tu clase",
+      });
+
+      // Refresh both lists
+      fetchStudents();
+      fetchUnassignedStudents();
+      setIsDialogOpen(false);
+      setSelectedStudent('');
+    } catch (error) {
+      console.error('Error in assignStudent:', error);
+    }
+  };
 
   // Fetch students from Supabase
   useEffect(() => {
-    const fetchStudents = async () => {
-      if (!user || user.role !== 'teacher') return;
-      
-      try {
-        setIsLoading(true);
-        
-        // Get teacher's code first
-        const { data: teacherData, error: teacherError } = await supabase
-          .from('teachers')
-          .select('teacher_code')
-          .eq('id', user.id)
-          .single();
-
-        if (teacherError) {
-          console.error('Error fetching teacher data:', teacherError);
-          return;
-        }
-
-        setTeacherCode(teacherData.teacher_code);
-
-        // Get students with teacher's code
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('students')
-          .select(`
-            *,
-            profiles!inner(id, email, full_name, avatar_url)
-          `)
-          .eq('teacher_code', teacherData.teacher_code);
-
-        if (studentsError) {
-          console.error('Error fetching students:', studentsError);
-          return;
-        }
-
-        // Transform data to match expected format
-        const transformedStudents = studentsData.map(student => ({
-          id: student.id,
-          name: student.profiles.full_name,
-          email: student.profiles.email,
-          level: student.grade || 'Básico',
-          joinDate: student.created_at.split('T')[0],
-          status: 'Activo',
-          avatar: student.profiles.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${student.profiles.email}`,
-        }));
-
-        setStudents(transformedStudents);
-      } catch (error) {
-        console.error('Error fetching students:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchStudents();
   }, [user]);
 
@@ -122,6 +192,18 @@ export const StudentsPage: React.FC = () => {
     );
   };
 
+  const copyTeacherCode = async () => {
+    try {
+      await navigator.clipboard.writeText(teacherCode);
+      toast({
+        title: "Código copiado",
+        description: "El código del profesor ha sido copiado al portapapeles",
+      });
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-subtle p-6">
       {/* Loading State */}
@@ -140,6 +222,50 @@ export const StudentsPage: React.FC = () => {
               <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Estudiantes</h1>
               <p className="text-muted-foreground">Administra tu lista de estudiantes y su información</p>
             </div>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => fetchUnassignedStudents()}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Asignar Estudiante
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Asignar Estudiante a tu Clase</DialogTitle>
+                  <DialogDescription>
+                    Selecciona un estudiante registrado para añadirlo a tu clase.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Select value={selectedStudent} onValueChange={setSelectedStudent}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un estudiante" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unassignedStudents.length === 0 ? (
+                        <SelectItem value="no-students" disabled>
+                          No hay estudiantes disponibles
+                        </SelectItem>
+                      ) : (
+                        unassignedStudents.map((student) => (
+                          <SelectItem key={student.id} value={student.id}>
+                            {student.name} - {student.email}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={assignStudent} disabled={!selectedStudent || selectedStudent === 'no-students'}>
+                      Asignar
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* KPIs */}
@@ -210,7 +336,7 @@ export const StudentsPage: React.FC = () => {
               </h3>
               <p className="text-muted-foreground mb-6">
                 {students.length === 0 
-                  ? 'Los estudiantes aparecerán aquí cuando se registren con tu código de profesor.'
+                  ? 'Los estudiantes aparecerán aquí cuando se registren y los asignes a tu clase.'
                   : 'Intenta con otros términos de búsqueda.'
                 }
               </p>
@@ -226,17 +352,14 @@ export const StudentsPage: React.FC = () => {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => {
-                        navigator.clipboard.writeText(teacherCode);
-                        // You could add a toast notification here
-                      }}
+                      onClick={copyTeacherCode}
                       className="text-blue-600 border-blue-300 hover:bg-blue-50"
                     >
-                      Copiar
+                      <Copy className="h-4 w-4" />
                     </Button>
                   </div>
                   <p className="text-xs text-blue-600 mt-2">
-                    Comparte este código con tus estudiantes para que puedan registrarse.
+                    Los estudiantes deben registrarse primero. Luego podrás asignarlos usando el botón "Asignar Estudiante".
                   </p>
                 </div>
               )}
