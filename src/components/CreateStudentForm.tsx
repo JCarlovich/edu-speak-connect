@@ -77,42 +77,60 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
         throw new Error('Error al obtener datos del profesor');
       }
 
-      // Generate a unique ID for the student
-      const studentId = crypto.randomUUID();
-
       // Check if a profile with this email already exists
       const { data: existingProfile, error: profileCheckError } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, role')
         .eq('email', studentEmail)
         .maybeSingle();
 
       if (profileCheckError) {
+        console.error('Error checking profile:', profileCheckError);
         throw new Error('Error al verificar si el perfil existe');
       }
 
-      let finalStudentId: string = studentId;
+      let finalStudentId: string;
 
-      // If profile doesn't exist, create it
-      if (!existingProfile) {
+      // If profile exists and is already a student, check if they're already linked to this teacher
+      if (existingProfile) {
+        finalStudentId = existingProfile.id;
+        
+        // Check if student is already linked to this teacher
+        const { data: existingStudent, error: studentCheckError } = await supabase
+          .from('students')
+          .select('id')
+          .eq('id', finalStudentId)
+          .eq('teacher_code', teacherData.teacher_code)
+          .maybeSingle();
+
+        if (studentCheckError) {
+          console.error('Error checking existing student:', studentCheckError);
+          throw new Error('Error al verificar el estudiante existente');
+        }
+
+        if (existingStudent) {
+          throw new Error('Este estudiante ya está registrado con este profesor');
+        }
+      } else {
+        // Create new profile since it doesn't exist
+        finalStudentId = crypto.randomUUID();
+        
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
-            id: studentId,
+            id: finalStudentId,
             email: studentEmail,
             full_name: studentName,
             role: 'student'
           });
 
         if (profileError) {
-          throw new Error('Error al crear el perfil del estudiante');
+          console.error('Profile creation error:', profileError);
+          throw new Error(`Error al crear el perfil: ${profileError.message}`);
         }
-      } else {
-        // Use the existing profile's ID
-        finalStudentId = existingProfile.id;
       }
 
-      // Now create student record with the correct ID
+      // Create student record
       const { data: studentData, error: studentError } = await supabase
         .from('students')
         .insert({
@@ -125,7 +143,8 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
         .single();
 
       if (studentError) {
-        throw new Error('Error al crear el estudiante');
+        console.error('Student creation error:', studentError);
+        throw new Error(`Error al crear el estudiante: ${studentError.message}`);
       }
 
       // If scheduling a class, create it
