@@ -30,7 +30,13 @@ export const ClassesPage: React.FC = () => {
     notes: ''
   });
 
-  const filteredClasses = classes.filter(cls => {
+  // Filter to show only future classes (today and forward)
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+  const futureClasses = classes.filter(cls => cls.date >= todayStr);
+
+  const filteredClasses = futureClasses.filter(cls => {
     const matchesSearch = cls.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          cls.topic.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'Todas' || cls.status === filterStatus;
@@ -115,7 +121,7 @@ export const ClassesPage: React.FC = () => {
       return acc;
     }, {} as Record<string, any[]>);
 
-    // Sort by date
+    // Sort by date (earliest first for future classes)
     const sortedDates = Object.keys(grouped).sort();
     return sortedDates.map(date => ({
       date,
@@ -254,10 +260,10 @@ export const ClassesPage: React.FC = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-            Clases Programadas
+            Próximas Clases
           </h1>
           <p className="text-gray-600">
-            Gestiona todas tus clases programadas y próximas sesiones
+            Gestiona tus clases programadas para hoy y días futuros
           </p>
         </div>
         <Button 

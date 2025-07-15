@@ -13,6 +13,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const students = [
   {
@@ -297,16 +299,19 @@ const students = [
         nextFocus: 'Retomar clases regularmente'
       }
     ]
-  },
+  }
 ];
 
 export const StudentsPage: React.FC = () => {
   const { addClass, updateClass, classes } = useClasses();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [students, setStudents] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Estados para el formulario de agregar estudiante + clase
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -323,6 +328,76 @@ export const StudentsPage: React.FC = () => {
     duration: '60',
     notes: ''
   });
+
+  // Fetch students from Supabase
+  useEffect(() => {
+    const fetchStudents = async () => {
+      if (!user || user.role !== 'teacher') return;
+      
+      try {
+        setIsLoading(true);
+        
+        // Get teacher's code first
+        const { data: teacherData, error: teacherError } = await supabase
+          .from('teachers')
+          .select('teacher_code')
+          .eq('id', user.id)
+          .single();
+
+        if (teacherError) {
+          console.error('Error fetching teacher data:', teacherError);
+          return;
+        }
+
+        // Get students with teacher's code
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('students')
+          .select(`
+            *,
+            profiles!inner(id, email, full_name, avatar_url)
+          `)
+          .eq('teacher_code', teacherData.teacher_code);
+
+        if (studentsError) {
+          console.error('Error fetching students:', studentsError);
+          return;
+        }
+
+        // Transform data to match expected format
+        const transformedStudents = studentsData.map(student => ({
+          id: student.id,
+          name: student.profiles.full_name,
+          email: student.profiles.email,
+          phone: '', // You can add phone to profiles table if needed
+          level: student.grade || 'Básico',
+          joinDate: student.created_at.split('T')[0],
+          classesCompleted: 0, // Calculate from classes
+          classesPaid: 0, // Calculate from classes
+          classesRemaining: 0, // Calculate from classes
+          totalRevenue: 0, // Calculate from classes
+          averageScore: 0, // Calculate from homework
+          lastClass: null, // Calculate from classes
+          nextClass: null, // Calculate from classes
+          homeworkCompleted: 0,
+          homeworkPending: 0,
+          status: 'Activo',
+          paymentStatus: 'Al día',
+          avatar: student.profiles.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${student.profiles.email}`,
+          classes: [],
+          homework: [],
+          summaries: []
+        }));
+
+        setStudents(transformedStudents);
+      } catch (error) {
+        console.error('Error fetching students:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, [user]);
 
   // Calculate KPIs
   const activeStudents = students.filter(student => student.status === 'Activo').length;
