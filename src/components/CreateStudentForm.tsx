@@ -80,7 +80,21 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
       // Generate a unique ID for the student
       const studentId = crypto.randomUUID();
 
-      // Create student record
+      // Create profile for the student FIRST (required by foreign key)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: studentId,
+          email: studentEmail,
+          full_name: studentName,
+          role: 'student'
+        });
+
+      if (profileError) {
+        throw new Error('Error al crear el perfil del estudiante');
+      }
+
+      // Now create student record
       const { data: studentData, error: studentError } = await supabase
         .from('students')
         .insert({
@@ -94,20 +108,6 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
 
       if (studentError) {
         throw new Error('Error al crear el estudiante');
-      }
-
-      // Create profile for the student
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: studentData.id,
-          email: studentEmail,
-          full_name: studentName,
-          role: 'student'
-        });
-
-      if (profileError) {
-        throw new Error('Error al crear el perfil del estudiante');
       }
 
       // If scheduling a class, create it
