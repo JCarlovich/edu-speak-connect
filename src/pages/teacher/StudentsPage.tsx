@@ -1,24 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Users, User, TrendingUp, DollarSign, UserPlus, Copy } from 'lucide-react';
+import { Plus, Search, Users, User, TrendingUp, DollarSign, UserPlus, Copy, Clock } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { CreateStudentForm } from '@/components/CreateStudentForm';
 
 export const StudentsPage: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [students, setStudents] = useState<any[]>([]);
-  const [unassignedStudents, setUnassignedStudents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [teacherCode, setTeacherCode] = useState<string>('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState('');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const fetchStudents = async () => {
     if (!user || user.role !== 'teacher') return;
@@ -55,84 +52,22 @@ export const StudentsPage: React.FC = () => {
       }
 
       // Transform data to match expected format
-      const transformedStudents = studentsData.map(student => ({
-        id: student.id,
-        name: student.profiles.full_name,
-        email: student.profiles.email,
-        level: student.grade || 'Básico',
-        joinDate: student.created_at.split('T')[0],
-        status: 'Activo',
-        avatar: student.profiles.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${student.profiles.email}`,
-      }));
+        const transformedStudents = studentsData.map(student => ({
+          id: student.id,
+          name: student.profiles.full_name,
+          email: student.profiles.email,
+          level: student.grade || 'Básico',
+          joinDate: student.created_at.split('T')[0],
+          status: student.is_registered ? 'Activo' : 'Pendiente de Registro',
+          avatar: student.profiles.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${student.profiles.email}`,
+          isRegistered: student.is_registered
+        }));
 
       setStudents(transformedStudents);
     } catch (error) {
       console.error('Error fetching students:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchUnassignedStudents = async () => {
-    try {
-      // Get students with 'UNASSIGNED' teacher code
-      const { data: unassignedData, error: unassignedError } = await supabase
-        .from('students')
-        .select(`
-          *,
-          profiles!inner(id, email, full_name, avatar_url)
-        `)
-        .eq('teacher_code', 'UNASSIGNED');
-
-      if (unassignedError) {
-        console.error('Error fetching unassigned students:', unassignedError);
-        return;
-      }
-
-      const formattedUnassigned = unassignedData?.map(student => ({
-        id: student.id,
-        name: student.profiles.full_name || 'Usuario',
-        email: student.profiles.email || '',
-        grade: student.grade || 'Sin grado'
-      })) || [];
-
-      setUnassignedStudents(formattedUnassigned);
-    } catch (error) {
-      console.error('Error in fetchUnassignedStudents:', error);
-    }
-  };
-
-  const assignStudent = async () => {
-    if (!selectedStudent || !teacherCode) return;
-
-    try {
-      const { error } = await supabase
-        .from('students')
-        .update({ teacher_code: teacherCode })
-        .eq('id', selectedStudent);
-
-      if (error) {
-        console.error('Error assigning student:', error);
-        toast({
-          title: "Error",
-          description: "No se pudo asignar el estudiante",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({
-        title: "Estudiante asignado",
-        description: "El estudiante ha sido añadido a tu clase",
-      });
-
-      // Refresh both lists
-      fetchStudents();
-      fetchUnassignedStudents();
-      setIsDialogOpen(false);
-      setSelectedStudent('');
-    } catch (error) {
-      console.error('Error in assignStudent:', error);
     }
   };
 
@@ -222,54 +157,14 @@ export const StudentsPage: React.FC = () => {
               <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Estudiantes</h1>
               <p className="text-muted-foreground">Administra tu lista de estudiantes y su información</p>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => fetchUnassignedStudents()}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Asignar Estudiante
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Asignar Estudiante a tu Clase</DialogTitle>
-                  <DialogDescription>
-                    Selecciona un estudiante registrado para añadirlo a tu clase.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un estudiante" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {unassignedStudents.length === 0 ? (
-                        <SelectItem value="no-students" disabled>
-                          No hay estudiantes disponibles
-                        </SelectItem>
-                      ) : (
-                        unassignedStudents.map((student) => (
-                          <SelectItem key={student.id} value={student.id}>
-                            {student.name} - {student.email}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                      Cancelar
-                    </Button>
-                    <Button onClick={assignStudent} disabled={!selectedStudent || selectedStudent === 'no-students'}>
-                      Asignar
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Dar de Alta Estudiante
+            </Button>
           </div>
 
           {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card className="bg-white/80 backdrop-blur-sm border-muted p-6">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -288,8 +183,20 @@ export const StudentsPage: React.FC = () => {
                   <TrendingUp className="h-6 w-6 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Estudiantes Activos</p>
-                  <p className="text-2xl font-bold text-foreground">{students.filter(s => s.status === 'Activo').length}</p>
+                  <p className="text-sm text-muted-foreground">Registrados</p>
+                  <p className="text-2xl font-bold text-foreground">{students.filter(s => s.isRegistered).length}</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="bg-white/80 backdrop-blur-sm border-muted p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg bg-orange-50 flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-orange-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Pendientes</p>
+                  <p className="text-2xl font-bold text-foreground">{students.filter(s => !s.isRegistered).length}</p>
                 </div>
               </div>
             </Card>
@@ -336,7 +243,7 @@ export const StudentsPage: React.FC = () => {
               </h3>
               <p className="text-muted-foreground mb-6">
                 {students.length === 0 
-                  ? 'Los estudiantes aparecerán aquí cuando se registren y los asignes a tu clase.'
+                  ? 'Comienza creando tu primer estudiante usando el botón "Dar de Alta Estudiante".'
                   : 'Intenta con otros términos de búsqueda.'
                 }
               </p>
@@ -359,7 +266,7 @@ export const StudentsPage: React.FC = () => {
                     </Button>
                   </div>
                   <p className="text-xs text-blue-600 mt-2">
-                    Los estudiantes deben registrarse primero. Luego podrás asignarlos usando el botón "Asignar Estudiante".
+                    Usa el botón "Dar de Alta Estudiante" para crear estudiantes y enviarles invitaciones automáticamente.
                   </p>
                 </div>
               )}
@@ -383,7 +290,9 @@ export const StudentsPage: React.FC = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Estado:</span>
-                        <span className="font-medium text-green-600">{student.status}</span>
+                        <span className={`font-medium ${student.isRegistered ? 'text-green-600' : 'text-orange-600'}`}>
+                          {student.status}
+                        </span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Registrado:</span>
@@ -397,6 +306,13 @@ export const StudentsPage: React.FC = () => {
               ))}
             </div>
           )}
+
+          {/* Create Student Dialog */}
+          <CreateStudentForm
+            isOpen={isCreateDialogOpen}
+            onOpenChange={setIsCreateDialogOpen}
+            onStudentCreated={fetchStudents}
+          />
         </>
       )}
     </div>

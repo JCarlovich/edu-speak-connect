@@ -114,18 +114,24 @@ export type Database = {
           created_at: string
           grade: string | null
           id: string
+          invitation_id: string
+          is_registered: boolean | null
           teacher_code: string
         }
         Insert: {
           created_at?: string
           grade?: string | null
           id: string
+          invitation_id?: string
+          is_registered?: boolean | null
           teacher_code: string
         }
         Update: {
           created_at?: string
           grade?: string | null
           id?: string
+          invitation_id?: string
+          is_registered?: boolean | null
           teacher_code?: string
         }
         Relationships: [
