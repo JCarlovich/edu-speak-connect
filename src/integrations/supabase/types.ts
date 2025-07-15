@@ -109,6 +109,50 @@ export type Database = {
         }
         Relationships: []
       }
+      student_invitations: {
+        Row: {
+          created_at: string
+          id: string
+          invitation_token: string
+          is_accepted: boolean | null
+          student_email: string
+          student_level: string | null
+          student_name: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invitation_token?: string
+          is_accepted?: boolean | null
+          student_email: string
+          student_level?: string | null
+          student_name: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invitation_token?: string
+          is_accepted?: boolean | null
+          student_email?: string
+          student_level?: string | null
+          student_name?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_teacher_invitations"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           created_at: string

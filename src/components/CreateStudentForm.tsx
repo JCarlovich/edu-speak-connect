@@ -89,17 +89,12 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
         throw new Error('Error al verificar si el perfil existe');
       }
 
-      let finalStudentId: string;
-
       if (existingProfile) {
-        // User is already registered, use their profile ID
-        finalStudentId = existingProfile.id;
-        
-        // Check if student is already linked to this teacher
+        // User is already registered - create student record directly
         const { data: existingStudent, error: studentCheckError } = await supabase
           .from('students')
           .select('id')
-          .eq('id', finalStudentId)
+          .eq('id', existingProfile.id)
           .eq('teacher_code', teacherData.teacher_code)
           .maybeSingle();
 
@@ -111,85 +106,73 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
         if (existingStudent) {
           throw new Error('Este estudiante ya está registrado con este profesor');
         }
+
+        // Create student record for existing user
+        const { data: studentData, error: studentError } = await supabase
+          .from('students')
+          .insert({
+            id: existingProfile.id,
+            teacher_code: teacherData.teacher_code,
+            grade: studentLevel,
+            is_registered: true
+          })
+          .select()
+          .single();
+
+        if (studentError) {
+          console.error('Student creation error:', studentError);
+          throw new Error(`Error al crear el estudiante: ${studentError.message}`);
+        }
+
+        // For existing users, we can create the class directly if requested
+        if (scheduleClass && classDate && classTime && topic) {
+          const { error: classError } = await supabase
+            .from('classes')
+            .insert({
+              teacher_id: user.id,
+              student_name: studentName,
+              student_email: studentEmail,
+              student_level: studentLevel,
+              class_date: classDate.toISOString().split('T')[0],
+              class_time: classTime,
+              duration: parseInt(duration),
+              topic: topic,
+              meeting_link: meetingLink || null,
+              notes: notes || null
+            });
+
+          if (classError) {
+            console.error('Class creation error:', classError);
+            throw new Error(`Error al programar la clase: ${classError.message}`);
+          }
+        }
       } else {
-        // User is not registered yet - create a student record with invitation
-        // We'll use a placeholder ID and store the actual user data when they register
-        finalStudentId = crypto.randomUUID();
-      }
-
-      // Create student record (this will serve as an invitation if user doesn't exist)
-      const { data: studentData, error: studentError } = await supabase
-        .from('students')
-        .insert({
-          id: finalStudentId,
-          teacher_code: teacherData.teacher_code,
-          grade: studentLevel,
-          is_registered: existingProfile ? true : false // Mark as registered if profile exists
-        })
-        .select()
-        .single();
-
-      if (studentError) {
-        console.error('Student creation error:', studentError);
-        throw new Error(`Error al crear el estudiante: ${studentError.message}`);
-      }
-
-      // If scheduling a class, create it
-      if (scheduleClass && classDate && classTime && topic) {
-        const { error: classError } = await supabase
-          .from('classes')
+        // User doesn't exist yet - create invitation
+        const { data: invitationData, error: invitationError } = await supabase
+          .from('student_invitations')
           .insert({
             teacher_id: user.id,
             student_name: studentName,
             student_email: studentEmail,
             student_level: studentLevel,
-            topic,
-            class_date: format(classDate, 'yyyy-MM-dd'),
-            class_time: classTime,
-            duration: parseInt(duration),
-            meeting_link: meetingLink || null,
-            notes: notes || null,
-            status: 'Programada',
-            payment_status: 'No Pagado'
-          });
-
-        if (classError) {
-          console.error('Error creating class:', classError);
-          // Don't throw error here, student is already created
-        }
-      }
-
-      // Send invitation email
-      try {
-        const response = await fetch('/functions/v1/send-student-invitation', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-          },
-          body: JSON.stringify({
-            studentName,
-            studentEmail,
-            invitationId: studentData.invitation_id,
-            teacherName: user.name
+            is_accepted: false
           })
-        });
+          .select()
+          .single();
 
-        if (!response.ok) {
-          throw new Error('Error al enviar invitación');
+        if (invitationError) {
+          console.error('Invitation creation error:', invitationError);
+          throw new Error(`Error al crear la invitación: ${invitationError.message}`);
         }
-      } catch (emailError) {
-        console.error('Error sending invitation email:', emailError);
-        toast({
-          title: "Estudiante creado",
-          description: "Estudiante creado correctamente, pero no se pudo enviar la invitación por email. Puedes reenviarla más tarde.",
-          variant: "default",
-        });
+
+        console.log('Invitation created:', invitationData);
       }
 
       toast({
         title: "¡Estudiante creado!",
-        description: `${studentName} ha sido dado de alta y se le ha enviado una invitación por email.`,
+        description: existingProfile 
+          ? `${studentName} ha sido registrado como tu estudiante.`
+          : `Se ha enviado una invitación a ${studentName} por email.`,
       });
 
       resetForm();
