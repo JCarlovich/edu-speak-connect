@@ -117,7 +117,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      teacher_code_exists: {
+        Args: { code: string }
+        Returns: boolean
+      }
     }
     Enums: {
       user_role: "teacher" | "student"
