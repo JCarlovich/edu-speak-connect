@@ -77,7 +77,7 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
         throw new Error('Error al obtener datos del profesor');
       }
 
-      // Check if a profile with this email already exists
+      // Check if a profile with this email already exists (for registered users)
       const { data: existingProfile, error: profileCheckError } = await supabase
         .from('profiles')
         .select('id, role')
@@ -91,8 +91,8 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
 
       let finalStudentId: string;
 
-      // If profile exists and is already a student, check if they're already linked to this teacher
       if (existingProfile) {
+        // User is already registered, use their profile ID
         finalStudentId = existingProfile.id;
         
         // Check if student is already linked to this teacher
@@ -112,32 +112,19 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
           throw new Error('Este estudiante ya está registrado con este profesor');
         }
       } else {
-        // Create new profile since it doesn't exist
+        // User is not registered yet - create a student record with invitation
+        // We'll use a placeholder ID and store the actual user data when they register
         finalStudentId = crypto.randomUUID();
-        
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: finalStudentId,
-            email: studentEmail,
-            full_name: studentName,
-            role: 'student'
-          });
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          throw new Error(`Error al crear el perfil: ${profileError.message}`);
-        }
       }
 
-      // Create student record
+      // Create student record (this will serve as an invitation if user doesn't exist)
       const { data: studentData, error: studentError } = await supabase
         .from('students')
         .insert({
           id: finalStudentId,
           teacher_code: teacherData.teacher_code,
           grade: studentLevel,
-          is_registered: false
+          is_registered: existingProfile ? true : false // Mark as registered if profile exists
         })
         .select()
         .single();
