@@ -43,33 +43,38 @@ export const ClassesPage: React.FC = () => {
     return matchesSearch && matchesFilter;
   });
 
-  const handleAddClass = () => {
-    const generatedLink = `https://meet.google.com/${Math.random().toString(36).substring(2, 15)}`;
-    const newClass = {
-      ...newClassData,
-      meetingLink: newClassData.meetingLink || generatedLink
-    };
-    
-    console.log('Creando clase con enlace:', newClass.meetingLink);
-    addClass(newClass);
-    
-    // Reset form
-    setNewClassData({
-      studentName: '',
-      studentEmail: '',
-      studentAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-      studentLevel: 'Básico',
-      topic: '',
-      date: '',
-      time: '',
-      duration: '60',
-      status: 'Programada',
-      paymentStatus: 'No Pagado',
-      meetingLink: '',
-      notes: ''
-    });
-    
-    setShowNewClassModal(false);
+  const handleAddClass = async () => {
+    try {
+      const generatedLink = newClassData.meetingLink || `https://meet.google.com/${Math.random().toString(36).substring(2, 15)}`;
+      const newClass = {
+        ...newClassData,
+        meetingLink: generatedLink
+      };
+      
+      console.log('Creando clase con enlace:', newClass.meetingLink);
+      await addClass(newClass);
+      
+      // Reset form
+      setNewClassData({
+        studentName: '',
+        studentEmail: '',
+        studentAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
+        studentLevel: 'Básico',
+        topic: '',
+        date: '',
+        time: '',
+        duration: '60',
+        status: 'Programada',
+        paymentStatus: 'No Pagado',
+        meetingLink: '',
+        notes: ''
+      });
+      
+      setShowNewClassModal(false);
+    } catch (error) {
+      console.error('Error creating class:', error);
+      alert('Error al crear la clase. Por favor, intenta de nuevo.');
+    }
   };
 
   const timeOptions = Array.from({ length: 24 }, (_, i) => {

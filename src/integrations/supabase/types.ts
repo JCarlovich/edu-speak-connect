@@ -14,6 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
+      classes: {
+        Row: {
+          class_date: string
+          class_time: string
+          created_at: string
+          duration: number
+          id: string
+          meeting_link: string | null
+          notes: string | null
+          payment_status: string
+          status: string
+          student_avatar: string | null
+          student_email: string
+          student_level: string
+          student_name: string
+          teacher_id: string
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          class_date: string
+          class_time: string
+          created_at?: string
+          duration?: number
+          id?: string
+          meeting_link?: string | null
+          notes?: string | null
+          payment_status?: string
+          status?: string
+          student_avatar?: string | null
+          student_email: string
+          student_level?: string
+          student_name: string
+          teacher_id: string
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          class_date?: string
+          class_time?: string
+          created_at?: string
+          duration?: number
+          id?: string
+          meeting_link?: string | null
+          notes?: string | null
+          payment_status?: string
+          status?: string
+          student_avatar?: string | null
+          student_email?: string
+          student_level?: string
+          student_name?: string
+          teacher_id?: string
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classes_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

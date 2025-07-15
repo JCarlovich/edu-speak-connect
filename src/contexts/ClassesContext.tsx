@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Class {
-  id: number;
+  id: string;
   studentName: string;
   studentAvatar: string;
   studentEmail: string;
@@ -18,9 +19,11 @@ interface Class {
 
 interface ClassesContextType {
   classes: Class[];
-  addClass: (classData: Omit<Class, 'id'>) => void;
-  updateClass: (id: number, updates: Partial<Class>) => void;
-  deleteClass: (id: number) => void;
+  addClass: (classData: Omit<Class, 'id'>) => Promise<void>;
+  updateClass: (id: string, updates: Partial<Class>) => Promise<void>;
+  deleteClass: (id: string) => Promise<void>;
+  isLoading: boolean;
+  refreshClasses: () => Promise<void>;
 }
 
 const ClassesContext = createContext<ClassesContextType | undefined>(undefined);
@@ -33,107 +36,175 @@ export const useClasses = () => {
   return context;
 };
 
-const defaultClasses: Class[] = [
-  {
-    id: 1,
-    studentName: 'Ana Martínez',
-    studentAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-    studentEmail: 'ana.martinez@email.com',
-    studentLevel: 'Intermedio',
-    topic: 'Conversación Avanzada',
-    date: '2025-07-20',
-    time: '10:00',
-    duration: '60',
-    status: 'Programada',
-    paymentStatus: 'Pagado',
-    meetingLink: 'https://meet.google.com/abc-defg-hij',
-    notes: 'Practicar tiempo pasado y vocabulario de viajes'
-  },
-  {
-    id: 2,
-    studentName: 'Carlos López',
-    studentAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    studentEmail: 'carlos.lopez@email.com',
-    studentLevel: 'Avanzado',
-    topic: 'Gramática: Subjuntivo',
-    date: '2025-07-16',
-    time: '14:00',
-    duration: '45',
-    status: 'Programada',
-    paymentStatus: 'No Pagado',
-    meetingLink: 'https://meet.google.com/xyz-abcd-efg',
-    notes: 'Continuar con cláusulas adverbiales'
-  },
-  {
-    id: 3,
-    studentName: 'María González',
-    studentAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-    studentEmail: 'maria.gonzalez@email.com',
-    studentLevel: 'Básico',
-    topic: 'Vocabulario Básico',
-    date: '2025-06-12',
-    time: '09:30',
-    duration: '30',
-    status: 'Completada',
-    paymentStatus: 'Pagado',
-    meetingLink: 'https://meet.google.com/hij-klmn-opq',
-    notes: 'Repasar números y colores'
-  },
-  {
-    id: 4,
-    studentName: 'Ana Martínez',
-    studentAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-    studentEmail: 'ana.martinez@email.com',
-    studentLevel: 'Intermedio',
-    topic: 'Práctica de Pronunciación',
-    date: '2025-07-18',
-    time: '11:00',
-    duration: '45',
-    status: 'Programada',
-    paymentStatus: 'No Pagado',
-    meetingLink: 'https://meet.google.com/rst-uvwx-yz1',
-    notes: 'Enfocarse en sonidos difíciles'
-  },
-  {
-    id: 5,
-    studentName: 'Pedro Ruiz',
-    studentAvatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-    studentEmail: 'pedro.ruiz@email.com',
-    studentLevel: 'Intermedio',
-    topic: 'Clase de Repaso',
-    date: '2025-08-20',
-    time: '16:00',
-    duration: '60',
-    status: 'Programada',
-    paymentStatus: 'Pagado',
-    meetingLink: '',
-    notes: 'Evaluación general del progreso'
-  }
-];
-
 export const ClassesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [classes, setClasses] = useState<Class[]>(defaultClasses);
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const addClass = (classData: Omit<Class, 'id'>) => {
-    const newClass: Class = {
-      ...classData,
-      id: Math.max(...classes.map(c => c.id), 0) + 1
-    };
-    setClasses(prev => [...prev, newClass]);
+  const fetchClasses = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('Error getting user:', userError);
+        setClasses([]);
+        return;
+      }
+
+      // Fetch classes for the current teacher
+      const { data: classesData, error: classesError } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('teacher_id', user.id)
+        .order('class_date', { ascending: true });
+
+      if (classesError) {
+        console.error('Error fetching classes:', classesError);
+        setClasses([]);
+        return;
+      }
+
+      // Transform data to match the interface
+      const transformedClasses: Class[] = classesData.map(cls => ({
+        id: cls.id,
+        studentName: cls.student_name,
+        studentAvatar: cls.student_avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${cls.student_email}`,
+        studentEmail: cls.student_email,
+        studentLevel: cls.student_level,
+        topic: cls.topic,
+        date: cls.class_date,
+        time: cls.class_time,
+        duration: cls.duration.toString(),
+        status: cls.status,
+        paymentStatus: cls.payment_status,
+        meetingLink: cls.meeting_link || '',
+        notes: cls.notes || ''
+      }));
+
+      setClasses(transformedClasses);
+    } catch (error) {
+      console.error('Error in fetchClasses:', error);
+      setClasses([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const updateClass = (id: number, updates: Partial<Class>) => {
-    setClasses(prev => prev.map(cls => 
-      cls.id === id ? { ...cls, ...updates } : cls
-    ));
+  const addClass = async (classData: Omit<Class, 'id'>) => {
+    try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error('Usuario no autenticado');
+      }
+
+      const { data, error } = await supabase
+        .from('classes')
+        .insert({
+          teacher_id: user.id,
+          student_name: classData.studentName,
+          student_email: classData.studentEmail,
+          student_avatar: classData.studentAvatar,
+          student_level: classData.studentLevel,
+          topic: classData.topic,
+          class_date: classData.date,
+          class_time: classData.time,
+          duration: parseInt(classData.duration),
+          status: classData.status,
+          payment_status: classData.paymentStatus,
+          meeting_link: classData.meetingLink,
+          notes: classData.notes
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // Refresh classes after adding
+      await fetchClasses();
+    } catch (error) {
+      console.error('Error adding class:', error);
+      throw error;
+    }
   };
 
-  const deleteClass = (id: number) => {
-    setClasses(prev => prev.filter(cls => cls.id !== id));
+  const updateClass = async (id: string, updates: Partial<Class>) => {
+    try {
+      const updateData: any = {};
+      
+      if (updates.studentName) updateData.student_name = updates.studentName;
+      if (updates.studentEmail) updateData.student_email = updates.studentEmail;
+      if (updates.studentAvatar) updateData.student_avatar = updates.studentAvatar;
+      if (updates.studentLevel) updateData.student_level = updates.studentLevel;
+      if (updates.topic) updateData.topic = updates.topic;
+      if (updates.date) updateData.class_date = updates.date;
+      if (updates.time) updateData.class_time = updates.time;
+      if (updates.duration) updateData.duration = parseInt(updates.duration);
+      if (updates.status) updateData.status = updates.status;
+      if (updates.paymentStatus) updateData.payment_status = updates.paymentStatus;
+      if (updates.meetingLink !== undefined) updateData.meeting_link = updates.meetingLink;
+      if (updates.notes !== undefined) updateData.notes = updates.notes;
+
+      const { error } = await supabase
+        .from('classes')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local state
+      setClasses(prev => prev.map(cls => 
+        cls.id === id ? { ...cls, ...updates } : cls
+      ));
+    } catch (error) {
+      console.error('Error updating class:', error);
+      throw error;
+    }
   };
+
+  const deleteClass = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local state
+      setClasses(prev => prev.filter(cls => cls.id !== id));
+    } catch (error) {
+      console.error('Error deleting class:', error);
+      throw error;
+    }
+  };
+
+  const refreshClasses = async () => {
+    await fetchClasses();
+  };
+
+  useEffect(() => {
+    fetchClasses();
+  }, []);
 
   return (
-    <ClassesContext.Provider value={{ classes, addClass, updateClass, deleteClass }}>
+    <ClassesContext.Provider value={{ 
+      classes, 
+      addClass, 
+      updateClass, 
+      deleteClass, 
+      isLoading,
+      refreshClasses 
+    }}>
       {children}
     </ClassesContext.Provider>
   );
