@@ -7,7 +7,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ClassesProvider } from './contexts/ClassesContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { DashboardLayout } from './components/layout/DashboardLayout';
-import { LoginPage } from './pages/auth/LoginPage';
+import { AuthPage } from './pages/auth/AuthPage';
+import Index from './pages/Index';
 import { TeacherDashboard } from './pages/teacher/TeacherDashboard';
 import { StudentsPage } from './pages/teacher/StudentsPage';
 import { ClassesPage } from './pages/teacher/ClassesPage';
@@ -26,21 +27,10 @@ const RoleBasedRedirect = () => {
   const { user } = useAuth();
   
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/auth" replace />;
   }
   
   return <Navigate to={user.role === 'teacher' ? '/classes' : '/student'} replace />;
-};
-
-// Main dashboard component that renders based on user role
-const Dashboard = () => {
-  const { user } = useAuth();
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return user.role === 'teacher' ? <ClassesPage /> : <StudentDashboard />;
 };
 
 const App = () => (
@@ -53,16 +43,11 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               {/* Public Routes */}
-              <Route path="/login" element={<LoginPage />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/login" element={<Navigate to="/auth" replace />} />
               
-              {/* Protected Routes with Dashboard Layout */}
-              <Route path="/" element={
-                <ProtectedRoute allowedRoles={['teacher']}>
-                  <DashboardLayout>
-                    <ClassesPage />
-                  </DashboardLayout>
-                </ProtectedRoute>
-              } />
+              {/* Landing Page */}
+              <Route path="/" element={<Index />} />
               
               {/* Teacher Routes */}
               <Route path="/dashboard" element={

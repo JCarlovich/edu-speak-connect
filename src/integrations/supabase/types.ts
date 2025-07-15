@@ -14,7 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name: string
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          created_at: string
+          grade: string | null
+          id: string
+          teacher_code: string
+        }
+        Insert: {
+          created_at?: string
+          grade?: string | null
+          id: string
+          teacher_code: string
+        }
+        Update: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          teacher_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_teacher_code_fkey"
+            columns: ["teacher_code"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["teacher_code"]
+          },
+        ]
+      }
+      teachers: {
+        Row: {
+          created_at: string
+          id: string
+          school_name: string | null
+          subject: string | null
+          teacher_code: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          school_name?: string | null
+          subject?: string | null
+          teacher_code: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          school_name?: string | null
+          subject?: string | null
+          teacher_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teachers_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +120,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      user_role: "teacher" | "student"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +247,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      user_role: ["teacher", "student"],
+    },
   },
 } as const
