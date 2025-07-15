@@ -17,6 +17,8 @@ export const AuthPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState(invitationId ? 'invitation' : 'login');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -136,6 +138,28 @@ export const AuthPage = () => {
       
     } catch (error: any) {
       setError(error.message || 'Error al registrarse');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+        redirectTo: `${window.location.origin}/auth?reset=true`,
+      });
+
+      if (error) throw error;
+
+      alert('Se ha enviado un enlace de recuperación a tu email.');
+      setShowForgotPassword(false);
+      setForgotEmail('');
+    } catch (error: any) {
+      setError(error.message || 'Error al enviar email de recuperación');
     } finally {
       setIsLoading(false);
     }
@@ -272,7 +296,50 @@ export const AuthPage = () => {
                     'Iniciar Sesión'
                   )}
                 </Button>
+
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </div>
               </form>
+
+              {/* Forgot Password Form */}
+              {showForgotPassword && (
+                <div className="mt-4 p-4 border rounded-lg bg-gray-50">
+                  <h3 className="font-semibold mb-3">Recuperar Contraseña</h3>
+                  <form onSubmit={handleForgotPassword} className="space-y-3">
+                    <div>
+                      <Label htmlFor="forgot-email">Email</Label>
+                      <Input
+                        id="forgot-email"
+                        type="email"
+                        placeholder="tu@email.com"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button type="submit" size="sm" disabled={isLoading}>
+                        Enviar enlace
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setShowForgotPassword(false)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              )}
 
               {/* Demo accounts */}
               <div className="mt-6 space-y-2">
