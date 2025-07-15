@@ -80,25 +80,43 @@ export const CreateStudentForm: React.FC<CreateStudentFormProps> = ({
       // Generate a unique ID for the student
       const studentId = crypto.randomUUID();
 
-      // Create profile for the student FIRST (required by foreign key)
-      const { error: profileError } = await supabase
+      // Check if a profile with this email already exists
+      const { data: existingProfile, error: profileCheckError } = await supabase
         .from('profiles')
-        .insert({
-          id: studentId,
-          email: studentEmail,
-          full_name: studentName,
-          role: 'student'
-        });
+        .select('id')
+        .eq('email', studentEmail)
+        .maybeSingle();
 
-      if (profileError) {
-        throw new Error('Error al crear el perfil del estudiante');
+      if (profileCheckError) {
+        throw new Error('Error al verificar si el perfil existe');
       }
 
-      // Now create student record
+      let finalStudentId: string = studentId;
+
+      // If profile doesn't exist, create it
+      if (!existingProfile) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: studentId,
+            email: studentEmail,
+            full_name: studentName,
+            role: 'student'
+          });
+
+        if (profileError) {
+          throw new Error('Error al crear el perfil del estudiante');
+        }
+      } else {
+        // Use the existing profile's ID
+        finalStudentId = existingProfile.id;
+      }
+
+      // Now create student record with the correct ID
       const { data: studentData, error: studentError } = await supabase
         .from('students')
         .insert({
-          id: studentId,
+          id: finalStudentId,
           teacher_code: teacherData.teacher_code,
           grade: studentLevel,
           is_registered: false
