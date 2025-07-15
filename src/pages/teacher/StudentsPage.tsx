@@ -37,7 +37,7 @@ export const StudentsPage: React.FC = () => {
 
       setTeacherCode(teacherData.teacher_code);
 
-      // Get students with teacher's code
+      // Get registered students with teacher's code
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
         .select(`
@@ -48,22 +48,47 @@ export const StudentsPage: React.FC = () => {
 
       if (studentsError) {
         console.error('Error fetching students:', studentsError);
-        return;
       }
 
-      // Transform data to match expected format
-        const transformedStudents = studentsData.map(student => ({
-          id: student.id,
-          name: student.profiles.full_name,
-          email: student.profiles.email,
-          level: student.grade || 'Básico',
-          joinDate: student.created_at.split('T')[0],
-          status: student.is_registered ? 'Activo' : 'Pendiente de Registro',
-          avatar: student.profiles.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${student.profiles.email}`,
-          isRegistered: student.is_registered
-        }));
+      // Get pending invitations
+      const { data: invitationsData, error: invitationsError } = await supabase
+        .from('student_invitations')
+        .select('*')
+        .eq('teacher_id', user.id);
 
-      setStudents(transformedStudents);
+      if (invitationsError) {
+        console.error('Error fetching invitations:', invitationsError);
+      }
+
+      // Transform registered students data
+      const transformedStudents = (studentsData || []).map(student => ({
+        id: student.id,
+        name: student.profiles.full_name,
+        email: student.profiles.email,
+        level: student.grade || 'Básico',
+        joinDate: student.created_at.split('T')[0],
+        status: 'Activo',
+        avatar: student.profiles.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${student.profiles.email}`,
+        isRegistered: true,
+        type: 'student'
+      }));
+
+      // Transform invitation data
+      const transformedInvitations = (invitationsData || []).map(invitation => ({
+        id: invitation.id,
+        name: invitation.student_name,
+        email: invitation.student_email,
+        level: invitation.student_level || 'Básico',
+        joinDate: invitation.created_at.split('T')[0],
+        status: 'Pendiente de Registro',
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${invitation.student_email}`,
+        isRegistered: false,
+        type: 'invitation'
+      }));
+
+      // Combine both arrays
+      const allStudents = [...transformedStudents, ...transformedInvitations];
+      setStudents(allStudents);
     } catch (error) {
       console.error('Error fetching students:', error);
     } finally {
